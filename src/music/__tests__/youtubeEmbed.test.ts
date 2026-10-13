@@ -100,6 +100,8 @@ interface PlayerConfig {
 
 class FakePlayer {
   readonly calls: string[] = [];
+  /** titre en cours dans la playlist */
+  index = 0;
   constructor(
     readonly target: string,
     readonly config: PlayerConfig,
@@ -112,6 +114,9 @@ class FakePlayer {
   }
   nextVideo() {
     this.calls.push('next');
+  }
+  getPlaylistIndex() {
+    return this.index;
   }
   playVideoAt(index: number) {
     this.calls.push(`playAt:${index}`);
@@ -130,21 +135,16 @@ const BUFFERING = 3;
 const ENDED = 0;
 
 /** Exécute le script de la page dans un environnement minimal, avec un faux YT et des minuteries à déclencher à la main. */
-const loadPage = (link: YoutubeLink, { hidden = false }: { hidden?: boolean } = {}) => {
+const loadPage = (link: YoutubeLink) => {
   const html = youtubeEmbedHtml(link);
   const match = /<script>([\s\S]*)<\/script>/.exec(html);
   if (!match) throw new Error('script introuvable');
 
   const posted: { type: string; code: string }[] = [];
   const timers: { fn: () => void; ms: number }[] = [];
-  const listeners: Record<string, () => void> = {};
   const appended: { src?: string; onerror?: () => void }[] = [];
   const players: FakePlayer[] = [];
   const doc = {
-    hidden,
-    addEventListener: (name: string, fn: () => void) => {
-      listeners[name] = fn;
-    },
     createElement: () => ({}) as { src?: string; onerror?: () => void },
     head: { appendChild: (el: { src?: string; onerror?: () => void }) => appended.push(el) },
   };
@@ -176,10 +176,6 @@ const loadPage = (link: YoutubeLink, { hidden = false }: { hidden?: boolean } = 
       return players[0];
     },
     cadence: win.cadence as { pause: () => void; resume: () => void },
-    visibility: (nowHidden: boolean) => {
-      doc.hidden = nowHidden;
-      listeners.visibilitychange();
-    },
     /** déclenche les minuteries programmées avec ce délai */
     elapse: (ms: number) => {
       const due = timers.filter((t) => t.ms === ms);
@@ -270,25 +266,20 @@ describe('page du lecteur', () => {
       expect(player.calls).toEqual([]);
     });
 
-    it('suit aussi la visibilité de la page', () => {
+    it('ne démarre rien si l’application passe en arrière-plan pendant le chargement', () => {
       const page = loadPage(playlist);
       const player = page.apiReady();
-      page.ready();
-      page.state(PLAYING);
-      player.calls.length = 0;
-      page.visibility(true);
-      page.state(PAUSED);
-      page.visibility(false);
-      expect(player.calls).toEqual(['pause', 'play']);
-    });
-
-    it('ne démarre rien si la page se charge pendant que l’application est en arrière-plan', () => {
-      const page = loadPage(playlist, { hidden: true });
-      const player = page.apiReady();
+      page.cadence.pause();
       page.ready();
       expect(player.calls).toEqual(['loop:true']);
-      page.visibility(false);
+      page.cadence.resume();
       expect(player.calls).toEqual(['loop:true', 'play']);
+    });
+
+    it('n’écoute pas la visibilité de la page : seule l’application décide de la pause', () => {
+      const html = youtubeEmbedHtml(playlist);
+      expect(html).not.toContain('visibilitychange');
+      expect(html).not.toContain('document.hidden');
     });
 
     it('coupe une lecture qui démarre en retard pendant la suspension', () => {
@@ -316,6 +307,30 @@ describe('page du lecteur', () => {
       page.elapse(SKIP_DELAY_MS);
       expect(player.calls).toEqual(['next']);
       expect(page.posted).toEqual([]);
+    });
+
+    it('ne saute pas un titre de plus quand le lecteur est déjà passé au suivant', () => {
+      const page = loadPage(playlist);
+      const player = page.apiReady();
+      page.ready();
+      player.calls.length = 0;
+      page.error(150);
+      player.index = 1;
+      page.elapse(SKIP_DELAY_MS);
+      expect(player.calls).toEqual([]);
+    });
+
+    it('saute quand le lecteur ne donne pas la position dans la playlist', () => {
+      const page = loadPage(playlist);
+      const player = page.apiReady();
+      page.ready();
+      player.getPlaylistIndex = () => {
+        throw new Error('indisponible');
+      };
+      player.calls.length = 0;
+      page.error(101);
+      page.elapse(SKIP_DELAY_MS);
+      expect(player.calls).toEqual(['next']);
     });
 
     it('renonce quand toute la suite est illisible', () => {

@@ -71,6 +71,7 @@ export const isYoutubeUrl = (url: string): boolean => {
  * Page du lecteur officiel de YouTube (API IFrame) pour une playlist ou une vidéo.
  * - `window.cadence.pause()` / `resume()` : l'application les appelle quand elle quitte l'écran ou revient, car YouTube interdit
  *   la lecture en arrière-plan. Rien ne joue tant que la page est suspendue, même si le lecteur démarre en retard.
+ *   Seule l'application décide : la visibilité de la page n'est pas écoutée, une WebView peut la signaler à tort et bloquer la lecture.
  * - Saute les vidéos qui refusent l'intégration (codes 100, 101, 150), puis signale l'échec à l'application (`failed`).
  * - Une playlist repart du début quand elle se termine ; une vidéo seule se répète.
  */
@@ -95,7 +96,7 @@ export const youtubeEmbedHtml = (link: YoutubeLink): string => {
   var player = null;
   var ready = false;
   var state = -1;
-  var suspended = document.hidden === true;
+  var suspended = false;
   var wasPlaying = false;
   var skips = 0;
   var failed = false;
@@ -122,9 +123,6 @@ export const youtubeEmbedHtml = (link: YoutubeLink): string => {
   }
 
   window.cadence = { pause: suspend, resume: resume };
-  document.addEventListener('visibilitychange', function () {
-    if (document.hidden) suspend(); else resume();
-  });
 
   function onStateChange(event) {
     state = event.data;
@@ -141,12 +139,20 @@ export const youtubeEmbedHtml = (link: YoutubeLink): string => {
     }, RESTART_DELAY);
   }
 
+  function playlistIndex() {
+    try { return player.getPlaylistIndex(); } catch (e) { return -1; }
+  }
+
   function onError(event) {
     var code = event.data;
     var skippable = SOURCE.kind === 'playlist' && (code === 100 || code === 101 || code === 150);
     if (skippable && skips < MAX_SKIPS) {
       skips += 1;
-      setTimeout(function () { player.nextVideo(); }, SKIP_DELAY);
+      var index = playlistIndex();
+      setTimeout(function () {
+        // si le lecteur est déjà passé au titre suivant de lui-même, on n'en saute pas un de plus
+        if (playlistIndex() === index) player.nextVideo();
+      }, SKIP_DELAY);
       return;
     }
     fail(String(code));
