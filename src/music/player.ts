@@ -2,6 +2,7 @@ import { createAudioPlayer, setAudioModeAsync, type AudioPlayer, type AudioStatu
 import { Linking } from 'react-native';
 import { create } from 'zustand';
 import type { Track } from './types';
+import type { YoutubeLink } from './youtube';
 
 export type PlayerStatus = 'idle' | 'loading' | 'playing' | 'paused';
 
@@ -20,6 +21,8 @@ export interface PlayerState {
   /** nom de la source affichée pendant la préparation (« Playlist de la séance », « Mes fichiers ») */
   source: string | null;
   external: ExternalPlayback | null;
+  /** playlist YouTube lue dans le panneau de la séance (le lecteur officiel de YouTube) */
+  youtube: YoutubeLink | null;
   /** explication à afficher dans le mini-lecteur quand la musique ne peut pas démarrer */
   message: string | null;
 }
@@ -31,6 +34,7 @@ const INITIAL: PlayerState = {
   sessionId: null,
   source: null,
   external: null,
+  youtube: null,
   message: null,
 };
 
@@ -173,7 +177,7 @@ export const startQueue = async (tracks: Track[], source: string, startIndex = 0
     const audio = await ensurePlayer();
     if (token !== startToken) return;
     failuresInRow = 0;
-    usePlayer.setState({ queue: tracks, index: startIndex, source, external: null, message: null, status: 'loading' });
+    usePlayer.setState({ queue: tracks, index: startIndex, source, external: null, youtube: null, message: null, status: 'loading' });
     try {
       audio.setActiveForLockScreen(true, metadataOf(tracks[startIndex]), {
         showSeekForward: false,
@@ -224,6 +228,21 @@ export const openExternalMusic = async (label: string, url: string): Promise<voi
   } catch {
     usePlayer.setState({ message: `Impossible d’ouvrir ${label}.` });
   }
+};
+
+/**
+ * Joue la playlist YouTube dans le panneau de la séance, avec le lecteur officiel : l'application reste utilisable par-dessus.
+ * YouTube interdit la lecture en arrière-plan : le panneau met la lecture en pause dès que l'application quitte l'écran.
+ */
+export const startYoutube = (link: YoutubeLink): void => {
+  releasePlayer();
+  // « playing » : la musique de la séance est lancée, ce qui évite un second lancement
+  usePlayer.setState({ ...INITIAL, sessionId: usePlayer.getState().sessionId, source: 'YouTube', youtube: link, status: 'playing' });
+};
+
+/** Ferme le panneau YouTube ; le mini-lecteur propose alors de relancer la musique. */
+export const stopYoutube = (): void => {
+  usePlayer.setState({ ...INITIAL, sessionId: usePlayer.getState().sessionId });
 };
 
 export const setPlayerMessage = (message: string | null): void => {

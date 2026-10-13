@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { muscleImages, placeImages } from '../../assets/images';
 import { Button, Card, ConfirmSheet, ExerciseThumb, Icon, IconButton, Screen, Text } from '../../components';
 import { capitalize, formatMinutes, plural } from '../../domain/format';
-import { LEVEL_LABEL, muscleSentence, PLACE_LABEL, WEEKDAY_SHORT } from '../../domain/labels';
+import { LEVEL_LABEL, muscleSentence, placeLabel, WEEKDAY_SHORT } from '../../domain/labels';
 import type { Program } from '../../domain/types';
 import { useStartCreation } from '../../hooks/useStartCreation';
 import { useAppStore } from '../../store';
@@ -101,8 +101,8 @@ function ProgramCard({
           <Text variant="rowTitle" numberOfLines={1}>
             {plural(program.sessions.length, 'séance', 'séances')} par semaine
           </Text>
-          <Text variant="caption" tone="subtle" numberOfLines={1}>
-            {LEVEL_LABEL[program.level]} · {PLACE_LABEL[program.place]} · {formatMinutes(program.durationMin)}
+          <Text variant="caption" tone="subtle" numberOfLines={2}>
+            {LEVEL_LABEL[program.level]} · {placeLabel(program.place, program.noWeights)} · {formatMinutes(program.durationMin)}
           </Text>
         </View>
         {active ? (

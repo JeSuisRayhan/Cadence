@@ -8,6 +8,7 @@ import {
   openExternalMusic,
   setPlayerMessage,
   startQueue,
+  startYoutube,
   usePlayer,
 } from './player';
 import { musicMessage } from './sources';
@@ -23,8 +24,8 @@ export const PLAYLIST_SOURCE = 'Playlist de la séance';
 
 /**
  * Lance la musique d'une séance selon les réglages :
- * - mode manuel : tes fichiers dans l'application, sinon ta playlist YouTube ouverte dans YouTube ;
- * - mode automatique : playlist composée dans l'application (Audius, plus Jamendo avec sa clé), ou recherche ouverte dans ton application musicale.
+ * - mode manuel : tes fichiers dans l'application, sinon ta playlist YouTube lue dans le panneau YouTube de la séance ;
+ * - mode automatique : playlist composée dans l'application (Audius, plus Jamendo si la compilation a reçu sa clé), ou recherche ouverte dans ton application musicale.
  */
 export const startSessionMusic = async (target: MusicTarget, music: MusicSettings): Promise<void> => {
   const current = usePlayer.getState();
@@ -38,7 +39,7 @@ export const startSessionMusic = async (target: MusicTarget, music: MusicSetting
     }
     const link = music.youtubeUrl ? parseYoutubeLink(music.youtubeUrl) : null;
     if (link) {
-      if (isCurrentStart(token)) await openExternalMusic('YouTube', link.url);
+      if (isCurrentStart(token)) startYoutube(link);
       return;
     }
     setPlayerMessage('Ajoute tes fichiers ou une playlist YouTube dans Musique.');

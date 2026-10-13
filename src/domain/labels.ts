@@ -36,6 +36,10 @@ export const PLACE_LABEL: Record<Place, string> = {
   salle: 'Salle',
 };
 
+/** « Maison », ou « Maison sans poids » quand la personne n'a pas de poids chez elle. */
+export const placeLabel = (place: Place, noWeights = false): string =>
+  place === 'maison' && noWeights ? 'Maison sans poids' : PLACE_LABEL[place];
+
 export const WEEKDAYS: readonly Weekday[] = [0, 1, 2, 3, 4, 5, 6];
 
 export const WEEKDAY_LONG: Record<Weekday, string> = {

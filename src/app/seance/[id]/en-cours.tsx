@@ -1,19 +1,21 @@
 import { useKeepAwake } from 'expo-keep-awake';
 import { Redirect, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { AppState, BackHandler } from 'react-native';
+import { AppState, BackHandler, StyleSheet, View } from 'react-native';
 import { ConfirmSheet } from '../../../components';
 import { getExercise } from '../../../domain/catalog';
 import { uid } from '../../../domain/id';
 import type { PlannedSession, Program } from '../../../domain/types';
 import { ExerciseView } from '../../../features/seance/ExerciseView';
 import { RestView } from '../../../features/seance/RestView';
+import { YoutubeDock } from '../../../features/seance/YoutubeDock';
 import { haptics } from '../../../hooks/useHaptics';
 import { useNow } from '../../../hooks/useNow';
-import { stopMusic } from '../../../music/player';
+import { stopMusic, usePlayer } from '../../../music/player';
 import { startSessionMusic } from '../../../music/session';
 import { cancelRestEnd, scheduleRestEnd } from '../../../notifications';
 import { findSession, useAppStore } from '../../../store';
+import { colors } from '../../../theme';
 import {
   buildSessionLog,
   initialWorkout,
@@ -39,6 +41,7 @@ function Workout({ program, session }: { program: Program; session: PlannedSessi
   const router = useRouter();
   const addLog = useAppStore((s) => s.addLog);
   const music = useAppStore((s) => s.music);
+  const youtube = usePlayer((s) => s.youtube);
 
   const plan = session.exercises;
   const reducer = useMemo(() => (state: WorkoutState, action: WorkoutAction) => workoutReducer(plan, state, action), [plan]);
@@ -137,53 +140,61 @@ function Workout({ program, session }: { program: Program; session: PlannedSessi
   const def = getExercise(planned.exerciseId);
   const hasProgress = loggedSetCount(state) > 0;
 
+  const docked = youtube !== null;
+
   return (
     <>
-      {state.phase === 'exercise' ? (
-        <ExerciseView
-          def={def}
-          exerciseIndex={state.exercise}
-          exerciseCount={plan.length}
-          setIndex={state.set}
-          totalSets={planned.sets}
-          target={planned.target}
-          timedLeft={timedRemainingSec(state, now)}
-          onComplete={() => dispatch({ type: 'complete', now: Date.now() })}
-          onStartTimed={() => dispatch({ type: 'start-timed', now: Date.now() })}
-          onClose={() => setConfirming(true)}
-          onStartMusic={startMusic}
-        />
-      ) : (
-        <RestView
-          def={def}
-          exerciseIndex={state.exercise}
-          exerciseCount={plan.length}
-          setIndex={state.set}
-          totalSets={planned.sets}
-          target={planned.target}
-          remainingSec={restRemainingSec(state, now)}
-          totalSec={state.restTotalSec}
-          finished={state.done}
-          reps={state.draftReps}
-          failed={state.draftFailed}
-          next={nextUp(plan, state)}
-          onAdjustRest={(deltaSec) => {
-            haptics.tick();
-            dispatch({ type: 'adjust-rest', deltaSec, now: Date.now() });
-          }}
-          onReps={(delta) => {
-            haptics.tick();
-            dispatch({ type: 'reps', delta });
-          }}
-          onToggleFailed={() => {
-            haptics.tick();
-            dispatch({ type: 'toggle-failed' });
-          }}
-          onContinue={state.done ? finish : () => dispatch({ type: 'skip-rest' })}
-          onFinish={finish}
-          onClose={() => setConfirming(true)}
-        />
-      )}
+      <View style={styles.screen}>
+        {state.phase === 'exercise' ? (
+          <ExerciseView
+            def={def}
+            exerciseIndex={state.exercise}
+            exerciseCount={plan.length}
+            setIndex={state.set}
+            totalSets={planned.sets}
+            target={planned.target}
+            timedLeft={timedRemainingSec(state, now)}
+            onComplete={() => dispatch({ type: 'complete', now: Date.now() })}
+            onStartTimed={() => dispatch({ type: 'start-timed', now: Date.now() })}
+            onClose={() => setConfirming(true)}
+            onStartMusic={startMusic}
+            docked={docked}
+          />
+        ) : (
+          <RestView
+            def={def}
+            exerciseIndex={state.exercise}
+            exerciseCount={plan.length}
+            setIndex={state.set}
+            totalSets={planned.sets}
+            target={planned.target}
+            remainingSec={restRemainingSec(state, now)}
+            totalSec={state.restTotalSec}
+            finished={state.done}
+            reps={state.draftReps}
+            failed={state.draftFailed}
+            next={nextUp(plan, state)}
+            onAdjustRest={(deltaSec) => {
+              haptics.tick();
+              dispatch({ type: 'adjust-rest', deltaSec, now: Date.now() });
+            }}
+            onReps={(delta) => {
+              haptics.tick();
+              dispatch({ type: 'reps', delta });
+            }}
+            onToggleFailed={() => {
+              haptics.tick();
+              dispatch({ type: 'toggle-failed' });
+            }}
+            onContinue={state.done ? finish : () => dispatch({ type: 'skip-rest' })}
+            onFinish={finish}
+            onClose={() => setConfirming(true)}
+            docked={docked}
+          />
+        )}
+        {/* au-dessus des deux écrans, jamais à l'intérieur : la lecture ne redémarre pas quand on passe de l'exercice au repos */}
+        {youtube ? <YoutubeDock key={youtube.id} link={youtube} /> : null}
+      </View>
       <ConfirmSheet
         visible={confirming}
         title="Quitter la séance ?"
@@ -197,3 +208,7 @@ function Workout({ program, session }: { program: Program; session: PlannedSessi
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.bg },
+});

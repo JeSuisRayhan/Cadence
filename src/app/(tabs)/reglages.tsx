@@ -5,6 +5,7 @@ import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { coverImages } from '../../assets/images';
 import { Card, Icon, ReminderCard, Screen, SectionTitle, Text } from '../../components';
 import { useReminderControls } from '../../hooks/useReminderControls';
+import { hasJamendo } from '../../music/jamendo';
 import { musicSummary } from '../../music/session';
 import { useAppStore } from '../../store';
 import { colors } from '../../theme';
@@ -65,11 +66,17 @@ export default function SettingsScreen() {
             <Text variant="captionSemi" tone="muted" accessibilityRole="link" onPress={() => void Linking.openURL('https://audius.co')}>
               Audius
             </Text>{' '}
-            (artistes indépendants) et{' '}
-            <Text variant="captionSemi" tone="muted" accessibilityRole="link" onPress={() => void Linking.openURL('https://www.jamendo.com')}>
-              Jamendo
-            </Text>{' '}
-            (musique libre, usage non commercial).
+            (artistes indépendants)
+            {hasJamendo() ? (
+              <>
+                {' '}et{' '}
+                <Text variant="captionSemi" tone="muted" accessibilityRole="link" onPress={() => void Linking.openURL('https://www.jamendo.com')}>
+                  Jamendo
+                </Text>{' '}
+                (musique libre, usage non commercial)
+              </>
+            ) : null}
+            .
           </Text>
         </Card>
       </View>

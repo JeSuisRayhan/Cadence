@@ -1,7 +1,7 @@
 name: Compiler l'APK Android
 
 # Se lance à chaque envoi sur main, ou à la main : onglet Actions → « Compiler l'APK Android » → Run workflow.
-# Aucun compte ni secret n'est nécessaire. Le secret JAMENDO_CLIENT_ID est facultatif (voir README.md).
+# Aucun compte ni secret n'est nécessaire. Le secret JAMENDO_CLIENT_ID est facultatif : s'il existe, la musique de Jamendo s'ajoute à celle d'Audius (voir README.md).
 on:
   push:
     branches: [main]
@@ -70,8 +70,18 @@ jobs:
       - name: Préparer Gradle (cache)
         uses: gradle/actions/setup-gradle@v4
 
-      # Clé Jamendo facultative : si le secret existe, elle est intégrée à l'application.
-      # Sinon on la colle une fois dans l'application (Réglages → Musique de séance).
+      # Dit dans le résumé de l'exécution si le secret Jamendo a été trouvé (sa valeur n'est jamais affichée).
+      - name: Clé Jamendo
+        run: |
+          if [ -n "$JAMENDO_CLIENT_ID" ]; then
+            echo "::notice title=Jamendo::Secret JAMENDO_CLIENT_ID trouvé : la musique de Jamendo sera ajoutée à celle d'Audius."
+          else
+            echo "::notice title=Jamendo::Pas de secret JAMENDO_CLIENT_ID : l'application utilisera Audius seul."
+          fi
+        env:
+          JAMENDO_CLIENT_ID: ${{ secrets.JAMENDO_CLIENT_ID }}
+
+      # Le secret Jamendo, s'il existe, est intégré à l'application pendant cette étape (variable EXPO_PUBLIC_…).
       - name: Compiler l'APK
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g" -PreactNativeArchitectures=arm64-v8a,armeabi-v7a

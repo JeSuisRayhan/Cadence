@@ -6,7 +6,7 @@ import { exerciseImages } from '../../assets/images';
 import { Button, Card, ExerciseThumb, Icon, IconButton, MetaRow, Pill, Screen, SectionTitle, Text } from '../../components';
 import { getExercise } from '../../domain/catalog';
 import { formatDateLong, plural, weekdayOf } from '../../domain/format';
-import { muscleDots, PLACE_LABEL, WEEKDAY_LETTER, WEEKDAY_LONG } from '../../domain/labels';
+import { muscleDots, placeLabel, WEEKDAY_LETTER, WEEKDAY_LONG } from '../../domain/labels';
 import type { PlannedSession, Program } from '../../domain/types';
 import {
   nextOccurrence,
@@ -126,7 +126,7 @@ function SessionHero({
         <View style={styles.heroPillLeft}>
           <Pill label={pill} />
         </View>
-        <Pill label={PLACE_LABEL[program.place]} icon={program.place === 'maison' ? 'home' : 'dumbbell'} />
+        <Pill label={placeLabel(program.place, program.noWeights)} icon={program.place === 'maison' ? 'home' : 'dumbbell'} />
       </View>
       <View style={styles.heroBottom}>
         <Text variant="label" tone="ember" numberOfLines={1}>

@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { muscleImages, placeImages } from '../../assets/images';
-import { Button, Icon, ImageTile, Screen, StepHeader, Text } from '../../components';
+import { Button, Card, Icon, ImageTile, Screen, StepHeader, Switch, Text } from '../../components';
 import { MUSCLES, MUSCLE_LABEL, PLACES, PLACE_LABEL } from '../../domain/labels';
 import { plural } from '../../domain/format';
 import { useDraft } from '../../store/draft';
@@ -14,9 +14,11 @@ export default function MusclesScreen() {
   const { width } = useWindowDimensions();
   const muscles = useDraft((s) => s.muscles);
   const place = useDraft((s) => s.place);
+  const noWeights = useDraft((s) => s.noWeights);
   const toggleMuscle = useDraft((s) => s.toggleMuscle);
   const toggleAll = useDraft((s) => s.toggleAllMuscles);
   const setPlace = useDraft((s) => s.setPlace);
+  const setNoWeights = useDraft((s) => s.setNoWeights);
 
   const tileWidth = Math.floor((Math.min(width, 560) - screenPadding * 2 - GAP * 2) / 3);
   const count = muscles.length;
@@ -90,6 +92,23 @@ export default function MusclesScreen() {
           </ImageTile>
         ))}
       </View>
+
+      {place === 'maison' ? (
+        <Card radiusSize="card" style={styles.weights}>
+          <View style={styles.weightsRow}>
+            <View style={styles.weightsBadge}>
+              <Icon name="dumbbell" size={18} color={colors.ember} />
+            </View>
+            <View style={styles.weightsText}>
+              <Text variant="bodySemi">Pas de poids à la maison</Text>
+              <Text variant="caption" tone="subtle">
+                {noWeights ? 'Que des exercices au poids du corps' : 'Certains exercices utilisent des haltères'}
+              </Text>
+            </View>
+            <Switch value={noWeights} onValueChange={setNoWeights} label="Pas de poids à la maison" />
+          </View>
+        </Card>
+      ) : null}
     </Screen>
   );
 }
@@ -103,4 +122,15 @@ const styles = StyleSheet.create({
   places: { marginTop: 10, flexDirection: 'row', gap: GAP },
   place: { flex: 1, height: 92 },
   placeLabel: { position: 'absolute', left: 12, bottom: 10, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  weights: { marginTop: 12 },
+  weightsRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, paddingVertical: 8, paddingLeft: 14, paddingRight: 8 },
+  weightsBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.emberTint,
+  },
+  weightsText: { flex: 1 },
 });

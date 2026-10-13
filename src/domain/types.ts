@@ -28,6 +28,8 @@ export interface Program {
   createdAt: number;
   level: Level;
   place: Place;
+  /** pas de poids à la maison : le programme n'utilise que des exercices au poids du corps (absent des anciens programmes) */
+  noWeights?: boolean;
   muscles: Muscle[];
   /** durée demandée par la personne, en minutes */
   durationMin: number;

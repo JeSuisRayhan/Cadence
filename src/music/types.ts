@@ -17,8 +17,6 @@ export interface MusicSettings {
   genres: GenreId[];
   autoEngine: AutoEngine;
   externalApp: ExternalApp;
-  /** identifiant client Jamendo (gratuit), facultatif : il ajoute le catalogue Jamendo à celui d'Audius, qui n'a pas besoin de clé */
-  jamendoClientId: string;
   files: LocalTrack[];
   /** lien d'une playlist YouTube */
   youtubeUrl: string | null;
@@ -31,7 +29,6 @@ export const DEFAULT_MUSIC: MusicSettings = {
   genres: ['hiphop', 'electro'],
   autoEngine: 'inapp',
   externalApp: 'spotify',
-  jamendoClientId: '',
   files: [],
   youtubeUrl: null,
   autoStart: true,

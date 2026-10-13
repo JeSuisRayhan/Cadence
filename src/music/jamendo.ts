@@ -22,9 +22,11 @@ interface RawResponse {
   results?: RawTrack[];
 }
 
-/** Clé Jamendo : celle saisie dans l'application, sinon celle fournie à la compilation. */
-export const resolveClientId = (saved: string): string =>
-  saved.trim() || (process.env.EXPO_PUBLIC_JAMENDO_CLIENT_ID ?? '').trim();
+/** Clé Jamendo : celle du secret GitHub `JAMENDO_CLIENT_ID`, intégrée à l'application à la compilation (vide sans secret). */
+export const jamendoClientId = (): string => (process.env.EXPO_PUBLIC_JAMENDO_CLIENT_ID ?? '').trim();
+
+/** Jamendo n'est interrogé que si la compilation a reçu une clé. */
+export const hasJamendo = (): boolean => jamendoClientId().length > 0;
 
 export const tracksUrl = (clientId: string, genre: GenreId, limit = PER_GENRE, offset = 0): string => {
   const params = new URLSearchParams({

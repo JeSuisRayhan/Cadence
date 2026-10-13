@@ -1,5 +1,5 @@
 import { jamendoBody, jamendoTrack as raw, offline, reply } from '../__fixtures__/network';
-import { fetchJamendoGenre, resolveClientId, tracksUrl } from '../jamendo';
+import { fetchJamendoGenre, hasJamendo, jamendoClientId, tracksUrl } from '../jamendo';
 
 describe('tracksUrl', () => {
   it('demande ce qu’il faut à Jamendo', () => {
@@ -19,19 +19,25 @@ describe('tracksUrl', () => {
   });
 });
 
-describe('resolveClientId', () => {
+describe('jamendoClientId', () => {
   const original = process.env.EXPO_PUBLIC_JAMENDO_CLIENT_ID;
   afterEach(() => {
     if (original === undefined) delete process.env.EXPO_PUBLIC_JAMENDO_CLIENT_ID;
     else process.env.EXPO_PUBLIC_JAMENDO_CLIENT_ID = original;
   });
 
-  it('préfère la clé saisie, sinon celle de la compilation', () => {
+  it('lit la clé donnée à la compilation, sans les espaces autour', () => {
     process.env.EXPO_PUBLIC_JAMENDO_CLIENT_ID = ' env-key ';
-    expect(resolveClientId(' saisie ')).toBe('saisie');
-    expect(resolveClientId('   ')).toBe('env-key');
+    expect(jamendoClientId()).toBe('env-key');
+    expect(hasJamendo()).toBe(true);
+  });
+
+  it('reste vide quand le secret n’existe pas ou est vide', () => {
     delete process.env.EXPO_PUBLIC_JAMENDO_CLIENT_ID;
-    expect(resolveClientId('')).toBe('');
+    expect(jamendoClientId()).toBe('');
+    expect(hasJamendo()).toBe(false);
+    process.env.EXPO_PUBLIC_JAMENDO_CLIENT_ID = '   ';
+    expect(hasJamendo()).toBe(false);
   });
 });
 

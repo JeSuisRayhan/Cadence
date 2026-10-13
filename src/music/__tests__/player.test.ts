@@ -6,7 +6,9 @@ import {
   previousTrack,
   selectCurrentTrack,
   startQueue,
+  startYoutube,
   stopMusic,
+  stopYoutube,
   togglePlayback,
   usePlayer,
 } from '../player';
@@ -280,5 +282,57 @@ describe('application musicale externe', () => {
     await openExternalMusic('Spotify', 'https://open.spotify.com/search/x/playlists');
     expect(fake.remove).toHaveBeenCalled();
     expect(usePlayer.getState().queue).toEqual([]);
+  });
+});
+
+describe('playlist YouTube dans l’application', () => {
+  const LIST = 'PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG';
+  const link = { kind: 'playlist' as const, id: LIST, url: `https://www.youtube.com/playlist?list=${LIST}` };
+
+  it('affiche le lecteur YouTube pour la séance et coupe la lecture interne', async () => {
+    await begin();
+    startYoutube(link);
+    expect(fake.clearLockScreenControls).toHaveBeenCalled();
+    expect(fake.remove).toHaveBeenCalled();
+    expect(usePlayer.getState()).toMatchObject({
+      youtube: link,
+      sessionId: 's1',
+      status: 'playing',
+      external: null,
+      queue: [],
+      message: null,
+    });
+  });
+
+  it('se ferme sans effacer la séance, pour pouvoir relancer la musique', () => {
+    beginSessionMusic('s1', 'Mes fichiers');
+    startYoutube(link);
+    stopYoutube();
+    expect(usePlayer.getState()).toMatchObject({ youtube: null, sessionId: 's1', status: 'idle' });
+  });
+
+  it('disparaît avec la séance', () => {
+    beginSessionMusic('s1', 'Mes fichiers');
+    startYoutube(link);
+    stopMusic();
+    expect(usePlayer.getState()).toMatchObject({ youtube: null, sessionId: null, status: 'idle' });
+  });
+
+  it('laisse la place à l’application YouTube quand on choisit de l’ouvrir', async () => {
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    beginSessionMusic('s1', 'Mes fichiers');
+    startYoutube(link);
+    await openExternalMusic('YouTube', link.url);
+    expect(open).toHaveBeenCalledWith(link.url);
+    expect(usePlayer.getState().youtube).toBeNull();
+    expect(usePlayer.getState().external).toEqual({ label: 'YouTube', url: link.url });
+  });
+
+  it('laisse la place à la lecture de fichiers', async () => {
+    beginSessionMusic('s1', 'Mes fichiers');
+    startYoutube(link);
+    await startQueue([track(1)], 'Mes fichiers');
+    expect(usePlayer.getState().youtube).toBeNull();
+    expect(fake.play).toHaveBeenCalledTimes(1);
   });
 });

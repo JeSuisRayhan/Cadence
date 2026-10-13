@@ -10,6 +10,8 @@ interface DraftState {
   level: Level;
   muscles: Muscle[];
   place: Place;
+  /** pas de poids à la maison : exercices au poids du corps uniquement */
+  noWeights: boolean;
   durationMin: number;
 
   setPerWeek: (n: number) => void;
@@ -18,6 +20,7 @@ interface DraftState {
   toggleMuscle: (muscle: Muscle) => void;
   toggleAllMuscles: () => void;
   setPlace: (place: Place) => void;
+  setNoWeights: (noWeights: boolean) => void;
   setDuration: (minutes: number) => void;
   reset: () => void;
 }
@@ -32,6 +35,7 @@ const initial = {
   level: 'inter' as Level,
   muscles: [] as Muscle[],
   place: 'maison' as Place,
+  noWeights: false,
   durationMin: 45,
 };
 
@@ -59,6 +63,8 @@ export const useDraft = create<DraftState>()((set) => ({
     set((s) => ({ muscles: s.muscles.length === MUSCLES.length ? [] : [...MUSCLES] })),
 
   setPlace: (place) => set({ place }),
+
+  setNoWeights: (noWeights) => set({ noWeights }),
 
   setDuration: (minutes) =>
     set({ durationMin: Math.min(DURATION_MAX, Math.max(DURATION_MIN, Math.round(minutes / DURATION_STEP) * DURATION_STEP)) }),

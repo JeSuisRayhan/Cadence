@@ -1,5 +1,5 @@
 import { composePlaylist } from './compose';
-import { resolveClientId } from './jamendo';
+import { jamendoClientId } from './jamendo';
 import type { ComposedPlaylist, GenreId, MusicSettings } from './types';
 
 /** Les titres ne se gardent pas hors ligne : la playlist reste en mémoire, quelques heures au plus. */
@@ -7,9 +7,8 @@ const TTL_MS = 3 * 60 * 60 * 1000;
 
 const cache = new Map<string, ComposedPlaylist>();
 
-/** Une clé Jamendo ajoutée ou changée donne un autre catalogue, donc une autre playlist. */
-export const playlistKey = (sessionId: string, genres: readonly GenreId[], durationMin: number, clientId = ''): string =>
-  `${sessionId}|${[...genres].sort().join(',')}|${durationMin}|${clientId}`;
+export const playlistKey = (sessionId: string, genres: readonly GenreId[], durationMin: number): string =>
+  `${sessionId}|${[...genres].sort().join(',')}|${durationMin}`;
 
 export const cachedPlaylist = (key: string, now: number = Date.now()): ComposedPlaylist | null => {
   const hit = cache.get(key);
@@ -26,7 +25,7 @@ export const clearPlaylists = (): void => cache.clear();
 export interface PlaylistRequest {
   sessionId: string;
   durationMin: number;
-  music: Pick<MusicSettings, 'genres' | 'jamendoClientId'>;
+  music: Pick<MusicSettings, 'genres'>;
   /** true : recomposer même si une playlist est déjà en mémoire */
   refresh?: boolean;
   signal?: AbortSignal;
@@ -40,13 +39,12 @@ export const loadPlaylist = async ({
   refresh = false,
   signal,
 }: PlaylistRequest): Promise<ComposedPlaylist> => {
-  const clientId = resolveClientId(music.jamendoClientId);
-  const key = playlistKey(sessionId, music.genres, durationMin, clientId);
+  const key = playlistKey(sessionId, music.genres, durationMin);
   if (!refresh) {
     const hit = cachedPlaylist(key);
     if (hit) return hit;
   }
-  const playlist = await composePlaylist({ sessionId, clientId, genres: music.genres, durationMin, signal });
+  const playlist = await composePlaylist({ sessionId, clientId: jamendoClientId(), genres: music.genres, durationMin, signal });
   cache.set(key, playlist);
   return playlist;
 };

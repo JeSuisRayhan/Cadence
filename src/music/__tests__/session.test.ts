@@ -1,7 +1,7 @@
 import { Linking } from 'react-native';
 import { audiusBody, audiusTrack, callsTo, fakeNetwork, jamendoBody, jamendoTrack, reply } from '../__fixtures__/network';
 import { clearPlaylists } from '../playlist';
-import { usePlayer, stopMusic } from '../player';
+import { usePlayer, stopMusic, stopYoutube } from '../player';
 import { musicSummary, startSessionMusic } from '../session';
 import { DEFAULT_MUSIC, type MusicSettings } from '../types';
 
@@ -49,7 +49,8 @@ let open: jest.SpyInstance;
 const originalEnvKey = process.env.EXPO_PUBLIC_JAMENDO_CLIENT_ID;
 
 beforeEach(() => {
-  delete process.env.EXPO_PUBLIC_JAMENDO_CLIENT_ID;
+  // par défaut la compilation a reçu une clé Jamendo (secret GitHub)
+  process.env.EXPO_PUBLIC_JAMENDO_CLIENT_ID = 'cle';
   stopMusic();
   clearPlaylists();
   jest.clearAllMocks();
@@ -74,11 +75,36 @@ describe('startSessionMusic', () => {
     expect(open).not.toHaveBeenCalled();
   });
 
-  it('mode manuel : sans fichier, ouvre la playlist YouTube dans YouTube', async () => {
+  it('mode manuel : sans fichier, lit la playlist YouTube dans le panneau de la séance', async () => {
     const link = 'https://www.youtube.com/playlist?list=PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG';
     await startSessionMusic(target, settings({ mode: 'manual', youtubeUrl: `${link}&si=zzz` }));
-    expect(open).toHaveBeenCalledWith(link);
-    expect(usePlayer.getState().external?.label).toBe('YouTube');
+    const state = usePlayer.getState();
+    expect(state.youtube).toEqual({ kind: 'playlist', id: 'PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG', url: link });
+    expect(state.sessionId).toBe('prog-1');
+    expect(state.external).toBeNull();
+    expect(open).not.toHaveBeenCalled();
+    expect(fake.play).not.toHaveBeenCalled();
+  });
+
+  it('mode manuel : les fichiers passent avant la playlist YouTube', async () => {
+    const files = [{ id: 'a', name: 'Premier', uri: 'file:///docs/music/a.mp3', kind: 'audio' as const }];
+    const youtubeUrl = 'https://www.youtube.com/playlist?list=PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG';
+    await startSessionMusic(target, settings({ mode: 'manual', files, youtubeUrl }));
+    expect(usePlayer.getState().youtube).toBeNull();
+    expect(usePlayer.getState().queue).toHaveLength(1);
+  });
+
+  it('mode manuel : ne relance pas la playlist YouTube déjà affichée, mais la relance après sa fermeture', async () => {
+    const youtubeUrl = 'https://www.youtube.com/playlist?list=PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG';
+    await startSessionMusic(target, settings({ mode: 'manual', youtubeUrl }));
+    const first = usePlayer.getState().youtube;
+    await startSessionMusic(target, settings({ mode: 'manual', youtubeUrl }));
+    expect(usePlayer.getState().youtube).toBe(first);
+
+    stopYoutube();
+    expect(usePlayer.getState().youtube).toBeNull();
+    await startSessionMusic(target, settings({ mode: 'manual', youtubeUrl }));
+    expect(usePlayer.getState().youtube).toMatchObject({ kind: 'playlist' });
   });
 
   it('mode manuel : explique quoi faire quand rien n’est ajouté', async () => {
@@ -97,7 +123,7 @@ describe('startSessionMusic', () => {
   it('automatique dans l’application : compose avec Audius et Jamendo puis joue la playlist', async () => {
     const fetchMock = services();
     global.fetch = fetchMock as unknown as typeof fetch;
-    await startSessionMusic(target, settings({ jamendoClientId: 'cle', genres: ['hiphop', 'electro'] }));
+    await startSessionMusic(target, settings({ genres: ['hiphop', 'electro'] }));
     expect(callsTo(fetchMock, 'api.jamendo.com')).toHaveLength(2);
     expect(callsTo(fetchMock, 'api.audius.co')).toHaveLength(2);
     const state = usePlayer.getState();
@@ -107,9 +133,10 @@ describe('startSessionMusic', () => {
   });
 
   it('automatique dans l’application : sans clé Jamendo, joue les titres d’Audius', async () => {
+    delete process.env.EXPO_PUBLIC_JAMENDO_CLIENT_ID;
     const fetchMock = services();
     global.fetch = fetchMock as unknown as typeof fetch;
-    await startSessionMusic(target, settings({ jamendoClientId: '', genres: ['pop'] }));
+    await startSessionMusic(target, settings({ genres: ['pop'] }));
     expect(callsTo(fetchMock, 'api.jamendo.com')).toHaveLength(0);
     expect(callsTo(fetchMock, 'api.audius.co')).toHaveLength(1);
     const { queue, message } = usePlayer.getState();
@@ -123,14 +150,14 @@ describe('startSessionMusic', () => {
 
   it('automatique dans l’application : explique l’échec réseau', async () => {
     global.fetch = jest.fn(() => Promise.reject(new TypeError('Network request failed'))) as unknown as typeof fetch;
-    await startSessionMusic(target, settings({ jamendoClientId: 'cle' }));
+    await startSessionMusic(target, settings({}));
     expect(usePlayer.getState().status).toBe('idle');
     expect(usePlayer.getState().message).toMatch(/connexion/);
   });
 
   it('automatique dans l’application : explique quand les deux sources ne répondent pas', async () => {
     global.fetch = fakeNetwork({ jamendo: () => reply({}, 503), audius: () => reply({}, 500) }) as unknown as typeof fetch;
-    await startSessionMusic(target, settings({ jamendoClientId: 'cle' }));
+    await startSessionMusic(target, settings({}));
     expect(usePlayer.getState().status).toBe('idle');
     expect(usePlayer.getState().message).toMatch(/ne répondent pas/);
     expect(fake.play).not.toHaveBeenCalled();
@@ -139,9 +166,9 @@ describe('startSessionMusic', () => {
   it('ne relance pas la musique déjà en cours pour la même séance', async () => {
     const fetchMock = services();
     global.fetch = fetchMock as unknown as typeof fetch;
-    await startSessionMusic(target, settings({ jamendoClientId: 'cle', genres: ['pop'] }));
+    await startSessionMusic(target, settings({ genres: ['pop'] }));
     const calls = fetchMock.mock.calls.length;
-    await startSessionMusic(target, settings({ jamendoClientId: 'cle', genres: ['pop'] }));
+    await startSessionMusic(target, settings({ genres: ['pop'] }));
     expect(fetchMock).toHaveBeenCalledTimes(calls);
     expect(fake.play).toHaveBeenCalledTimes(1);
   });
@@ -149,9 +176,9 @@ describe('startSessionMusic', () => {
   it('réutilise la playlist composée quand on relance la même séance', async () => {
     const fetchMock = services();
     global.fetch = fetchMock as unknown as typeof fetch;
-    await startSessionMusic(target, settings({ jamendoClientId: 'cle', genres: ['pop'] }));
+    await startSessionMusic(target, settings({ genres: ['pop'] }));
     stopMusic();
-    await startSessionMusic(target, settings({ jamendoClientId: 'cle', genres: ['pop'] }));
+    await startSessionMusic(target, settings({ genres: ['pop'] }));
     expect(callsTo(fetchMock, 'api.audius.co')).toHaveLength(1);
     expect(callsTo(fetchMock, 'api.jamendo.com')).toHaveLength(1);
     expect(fake.play).toHaveBeenCalledTimes(2);
@@ -171,7 +198,7 @@ describe('startSessionMusic', () => {
           );
         }),
     ) as unknown as typeof fetch;
-    const pending = startSessionMusic(target, settings({ jamendoClientId: 'cle', genres: ['pop'] }));
+    const pending = startSessionMusic(target, settings({ genres: ['pop'] }));
     stopMusic();
     releases.forEach((release) => release(undefined));
     await pending;

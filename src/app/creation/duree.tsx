@@ -8,20 +8,25 @@ import { DURATION_MAX, DURATION_MIN, DURATION_STEP, useDraft } from '../../store
 import { colors } from '../../theme';
 
 const PRESETS = [30, 45, 60, 75, 90];
+/** Écart (en minutes) à partir duquel on prévient que la séance sera plus courte que demandé. */
+const SHORT_BY_MIN = 10;
 
 export default function DurationScreen() {
   const router = useRouter();
   const muscles = useDraft((s) => s.muscles);
   const level = useDraft((s) => s.level);
   const place = useDraft((s) => s.place);
+  const noWeights = useDraft((s) => s.noWeights);
   const weekdays = useDraft((s) => s.weekdays);
   const durationMin = useDraft((s) => s.durationMin);
   const setDuration = useDraft((s) => s.setDuration);
 
   const preview = useMemo(
-    () => previewSession({ muscles, level, place, durationMin, weekdays: [...weekdays].sort((a, b) => a - b) }),
-    [muscles, level, place, durationMin, weekdays],
+    () => previewSession({ muscles, level, place, noWeights, durationMin, weekdays: [...weekdays].sort((a, b) => a - b) }),
+    [muscles, level, place, noWeights, durationMin, weekdays],
   );
+  // le catalogue n'a pas toujours assez d'exercices pour remplir la durée demandée (peu de muscles, pas de poids…)
+  const shortfall = preview.shortestMin > 0 && preview.shortestMin <= durationMin - SHORT_BY_MIN;
 
   return (
     <Screen
@@ -107,6 +112,12 @@ export default function DurationScreen() {
           </Text>
         </View>
       </Card>
+      {shortfall ? (
+        <Text variant="caption" tone="muted" style={styles.shortfall}>
+          Pas assez d’exercices pour ces muscles : la séance la plus courte durera environ {preview.shortestMin} min. Ajoute des muscles pour
+          l’allonger.
+        </Text>
+      ) : null}
     </Screen>
   );
 }
@@ -123,4 +134,5 @@ const styles = StyleSheet.create({
   stat: { flex: 1, gap: 2, paddingVertical: 16, paddingHorizontal: 18 },
   statDivider: { borderLeftWidth: 1, borderLeftColor: colors.border },
   statLabel: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  shortfall: { marginTop: 12, paddingHorizontal: 4 },
 });

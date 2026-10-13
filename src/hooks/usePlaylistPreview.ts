@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { resolveClientId } from '../music/jamendo';
 import { cachedPlaylist, loadPlaylist, playlistKey } from '../music/playlist';
 import { musicMessage } from '../music/sources';
 import type { ComposedPlaylist, GenreId, MusicSettings } from '../music/types';
@@ -26,13 +25,12 @@ const DEBOUNCE_MS = 350;
  */
 export const usePlaylistPreview = (
   target: PreviewTarget,
-  music: Pick<MusicSettings, 'mode' | 'autoEngine' | 'genres' | 'jamendoClientId'>,
+  music: Pick<MusicSettings, 'mode' | 'autoEngine' | 'genres'>,
 ): { state: PreviewState; refresh: () => void } => {
   const enabled = music.mode === 'auto' && music.autoEngine === 'inapp';
-  const clientId = resolveClientId(music.jamendoClientId);
   const genresKey = [...music.genres].sort().join(',');
   const genres = useMemo(() => genresKey.split(',').filter(Boolean) as GenreId[], [genresKey]);
-  const cacheKey = playlistKey(target.id, genres, target.durationMin, clientId);
+  const cacheKey = playlistKey(target.id, genres, target.durationMin);
 
   const [result, setResult] = useState<{ key: string; outcome: Outcome } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -46,7 +44,7 @@ export const usePlaylistPreview = (
       loadPlaylist({
         sessionId: target.id,
         durationMin: target.durationMin,
-        music: { genres, jamendoClientId: clientId },
+        music: { genres },
         refresh,
         signal: controller.signal,
       })
@@ -58,7 +56,7 @@ export const usePlaylistPreview = (
           setRefreshing(false);
         });
     },
-    [target.id, target.durationMin, genres, clientId, cacheKey],
+    [target.id, target.durationMin, genres, cacheKey],
   );
 
   // composition automatique quand les réglages changent et qu'aucune playlist n'est encore en mémoire

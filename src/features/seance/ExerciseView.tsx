@@ -22,6 +22,8 @@ export interface ExerciseViewProps {
   onStartTimed: () => void;
   onClose: () => void;
   onStartMusic: () => void;
+  /** le panneau YouTube occupe le bas de l'écran : l'image se réduit au besoin et le bouton OK n'ajoute pas la marge du bas */
+  docked?: boolean;
 }
 
 /** Une série en cours : l'exercice en grand, le nombre de répétitions, et le bouton OK. */
@@ -37,6 +39,7 @@ export function ExerciseView({
   onStartTimed,
   onClose,
   onStartMusic,
+  docked = false,
 }: ExerciseViewProps) {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
@@ -49,7 +52,7 @@ export function ExerciseView({
 
   return (
     <View style={styles.root}>
-      <View style={{ height: heroHeight }}>
+      <View style={[{ height: heroHeight, minHeight: top + 150 }, styles.hero]}>
         <Image
           source={exerciseImages[def.image]}
           accessibilityLabel={def.name}
@@ -102,7 +105,7 @@ export function ExerciseView({
         </View>
       </View>
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 12 }]}>
+      <View style={[styles.footer, { paddingBottom: docked ? 12 : Math.max(insets.bottom, 12) + 12 }]}>
         <Button
           size="xl"
           label={waiting ? 'Démarrer' : 'OK'}
@@ -119,6 +122,8 @@ export function ExerciseView({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
+  // l'image cède de la place quand l'écran est court (tablette en paysage avec le panneau YouTube)
+  hero: { flexShrink: 1 },
   bars: { position: 'absolute', left: screenPadding, right: screenPadding, flexDirection: 'row' },
   close: { position: 'absolute', left: screenPadding },
   pill: { position: 'absolute', right: screenPadding },
@@ -137,5 +142,5 @@ const styles = StyleSheet.create({
   setBars: { flexDirection: 'row', gap: 6 },
   setBar: { width: 26, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.2)' },
   setBarOn: { backgroundColor: colors.ember },
-  footer: { marginTop: 'auto', paddingHorizontal: screenPadding, gap: 12 },
+  footer: { marginTop: 'auto', paddingTop: 12, paddingHorizontal: screenPadding, gap: 12 },
 });

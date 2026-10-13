@@ -12,6 +12,8 @@ export interface ProgramInput {
   durationMin: number;
   /** jours d'entraînement, triés */
   weekdays: readonly Weekday[];
+  /** pas de haltères à la maison : seuls des exercices au poids du corps sont proposés (sans effet en salle) */
+  noWeights?: boolean;
 }
 
 const PUSH: readonly Muscle[] = ['pecs', 'epaules', 'triceps'];
@@ -73,9 +75,11 @@ const plan = (def: ExerciseDef, level: Level): PlannedExercise => {
 };
 
 /** Exercices candidats pour un muscle : polyarticulaires d'abord, variés d'une semaine à l'autre. */
-const candidatesFor = (muscle: Muscle, level: Level, place: Place, pass: number): ExerciseDef[] => {
+const candidatesFor = (muscle: Muscle, level: Level, place: Place, noWeights: boolean, pass: number): ExerciseDef[] => {
   const lvl = levelIndex(level);
-  const pool = EXERCISES.filter((e) => e.places.includes(place) && e.minLevel <= lvl && e.muscles[0] === muscle);
+  const pool = EXERCISES.filter(
+    (e) => e.places.includes(place) && e.minLevel <= lvl && e.muscles[0] === muscle && !(noWeights && e.weights),
+  );
   return [...rotate(pool.filter((e) => e.compound), pass), ...rotate(pool.filter((e) => !e.compound), pass)];
 };
 
@@ -155,26 +159,27 @@ interface SessionPlanInput {
   muscles: Muscle[];
   level: Level;
   place: Place;
+  noWeights: boolean;
   durationMin: number;
   /** l'exercice d'abdos ajouté en fin de séance, s'il y en a un */
   withCore: boolean;
   pass: number;
 }
 
-const buildExercises = ({ muscles, level, place, durationMin, withCore, pass }: SessionPlanInput): PlannedExercise[] => {
+const buildExercises = ({ muscles, level, place, noWeights, durationMin, withCore, pass }: SessionPlanInput): PlannedExercise[] => {
   const totalSec = durationMin * 60;
   let targetSec = totalSec;
 
   let finisher: PlannedExercise | null = null;
   if (withCore) {
-    const core = candidatesFor('abdos', level, place, pass)[0];
+    const core = candidatesFor('abdos', level, place, noWeights, pass)[0];
     if (core) {
       finisher = plan(core, level);
       targetSec -= estimateSeconds([finisher]) + finisher.restSec + TRANSITION_SEC;
     }
   }
 
-  const lists = muscles.map((m) => candidatesFor(m, level, place, pass));
+  const lists = muscles.map((m) => candidatesFor(m, level, place, noWeights, pass));
   const queue = preferDistinctImages(interleave(lists));
   const list = fill(queue, level, Math.max(targetSec, 0), MAX_EXERCISES - (finisher ? 1 : 0));
   // tous les exercices d'un muscle à la suite, dans l'ordre des muscles de la séance (les polyarticulaires d'abord)
@@ -192,6 +197,8 @@ const buildExercises = ({ muscles, level, place, durationMin, withCore, pass }: 
  */
 export const generateSessions = (input: ProgramInput, programId: string): PlannedSession[] => {
   const { level, place, durationMin } = input;
+  // en salle il y a toujours des poids : le choix ne compte qu'à la maison
+  const noWeights = place === 'maison' && input.noWeights === true;
   const weekdays = [...input.weekdays].sort((a, b) => a - b);
   const wantsCore = input.muscles.includes('abdos');
   const groups = splitGroups(input.muscles);
@@ -205,6 +212,7 @@ export const generateSessions = (input: ProgramInput, programId: string): Planne
       muscles,
       level,
       place,
+      noWeights,
       durationMin,
       withCore: wantsCore && groups.length > 0,
       pass: passes[i],
@@ -228,18 +236,27 @@ export const createProgram = (input: ProgramInput, now: number = Date.now(), id:
   createdAt: now,
   level: input.level,
   place: input.place,
+  noWeights: input.place === 'maison' && input.noWeights === true,
   muscles: [...input.muscles],
   durationMin: input.durationMin,
   weekdays: [...input.weekdays].sort((a, b) => a - b),
   sessions: generateSessions(input, id),
 });
 
-/** Aperçu pour l'écran de durée : nombre d'exercices et calories de la première séance. */
-export const previewSession = (input: ProgramInput): { exercises: number; kcal: number; durationMin: number } => {
-  const [first] = generateSessions(input, 'apercu');
+/** Aperçu pour l'écran de durée : exercices et calories de la première séance, et durée de la plus courte de la semaine. */
+export const previewSession = (
+  input: ProgramInput,
+): { exercises: number; kcal: number; durationMin: number; shortestMin: number } => {
+  const sessions = generateSessions(input, 'apercu');
+  const [first] = sessions;
   return first
-    ? { exercises: first.exercises.length, kcal: first.kcal, durationMin: first.durationMin }
-    : { exercises: 0, kcal: 0, durationMin: 0 };
+    ? {
+        exercises: first.exercises.length,
+        kcal: first.kcal,
+        durationMin: first.durationMin,
+        shortestMin: Math.min(...sessions.map((s) => s.durationMin)),
+      }
+    : { exercises: 0, kcal: 0, durationMin: 0, shortestMin: 0 };
 };
 
 export { getExercise };

@@ -135,7 +135,7 @@ export function ManualPanel() {
             <Row
               first
               title="Playlist YouTube"
-              sub="S’ouvre dans YouTube"
+              sub="Lue dans l’appli pendant la séance"
               cover={<Image source={coverImages.ytmix} style={styles.cover} contentFit="cover" />}
               removeLabel="Retirer la playlist YouTube"
               onRemove={() => setMusic({ youtubeUrl: null })}
@@ -170,11 +170,12 @@ export function ManualPanel() {
         </Card>
         {files.length > 0 && savedLink ? (
           <Text variant="caption" tone="subtle" style={styles.note}>
-            Cadence lit tes fichiers dans l’application. La playlist YouTube s’ouvre dans YouTube quand il n’y a aucun fichier.
+            Cadence lit tes fichiers dans l’application. La playlist YouTube ne se lit que s’il n’y a aucun fichier.
           </Text>
         ) : savedLink ? (
           <Text variant="caption" tone="subtle" style={styles.note}>
-            YouTube ne permet pas la lecture dans une autre application : au début de la séance, Cadence ouvre ta playlist dans YouTube.
+            La playlist se lit en bas de l’écran de séance : tu gardes l’appli sous la main. YouTube l’arrête dès que tu quittes l’appli ou
+            verrouilles l’écran. Pour de la musique écran éteint, importe des fichiers ou choisis le mode automatique.
           </Text>
         ) : null}
       </View>

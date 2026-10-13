@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { BodyMap, Button, Card, IconButton, ReminderCard, Screen, Text } from '../../components';
 import { plural } from '../../domain/format';
 import { createProgram } from '../../domain/generator';
-import { LEVEL_LABEL, MUSCLES, MUSCLE_LABEL, PLACE_LABEL, WEEKDAY_SHORT } from '../../domain/labels';
+import { LEVEL_LABEL, MUSCLES, MUSCLE_LABEL, placeLabel, WEEKDAY_SHORT } from '../../domain/labels';
 import { useReminderControls } from '../../hooks/useReminderControls';
 import { ensureNotificationPermission } from '../../notifications';
 import { useAppStore } from '../../store';
@@ -26,7 +26,7 @@ export default function ReadyScreen() {
     { label: 'Rythme', value: weekdays.map((d) => WEEKDAY_SHORT[d]).join(' · ') },
     { label: 'Durée', value: `${draft.durationMin} min` },
     { label: 'Niveau', value: LEVEL_LABEL[draft.level] },
-    { label: 'Lieu', value: PLACE_LABEL[draft.place] },
+    { label: 'Lieu', value: placeLabel(draft.place, draft.noWeights) },
   ];
 
   const confirm = async () => {
@@ -39,6 +39,7 @@ export default function ReadyScreen() {
         muscles,
         level: draft.level,
         place: draft.place,
+        noWeights: draft.noWeights,
         durationMin: draft.durationMin,
         weekdays,
       }),

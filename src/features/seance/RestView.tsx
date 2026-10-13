@@ -27,6 +27,8 @@ export interface RestViewProps {
   onContinue: () => void;
   onFinish: () => void;
   onClose: () => void;
+  /** le panneau YouTube occupe le bas de l'écran : les boutons n'ajoutent pas la marge du bas */
+  docked?: boolean;
 }
 
 /** Repos entre deux séries : chrono, répétitions faites (ou échec) et série suivante. */
@@ -49,6 +51,7 @@ export function RestView({
   onContinue,
   onFinish,
   onClose,
+  docked = false,
 }: RestViewProps) {
   const insets = useSafeAreaInsets();
   const top = Math.max(insets.top, 12) + 10;
@@ -169,7 +172,7 @@ export function RestView({
         ) : null}
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 2 }]}>
+      <View style={[styles.footer, { paddingBottom: docked ? 8 : Math.max(insets.bottom, 12) + 2 }]}>
         <Button label={finished ? 'Terminer la séance' : 'Passer le repos'} onPress={onContinue} />
         {finished ? null : (
           <Pressable accessibilityRole="button" accessibilityLabel="Terminer la séance" onPress={onFinish} style={styles.quiet}>

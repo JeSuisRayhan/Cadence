@@ -1,7 +1,8 @@
 import { EXERCISES, getExercise } from '../catalog';
 import { estimateSeconds, kcalForSeconds } from '../estimates';
 import { createProgram, generateSessions, previewSession, sessionTitle, splitGroups } from '../generator';
-import type { Muscle, Weekday } from '../types';
+import { MUSCLES, placeLabel } from '../labels';
+import type { Level, Muscle, Weekday } from '../types';
 
 const days = (...d: number[]) => d as Weekday[];
 
@@ -230,5 +231,93 @@ describe('génération du programme', () => {
     });
     expect(preview.exercises).toBeGreaterThanOrEqual(5);
     expect(preview.kcal).toBeGreaterThan(0);
+  });
+});
+
+describe('sans poids à la maison', () => {
+  const all: Muscle[] = [...MUSCLES];
+  const levels: Level[] = ['debutant', 'inter', 'avance'];
+  const home = { place: 'maison' as const, noWeights: true };
+
+  it('marque les exercices qui demandent des haltères', () => {
+    for (const id of ['curl', 'rowing', 'militaire', 'elevations', 'tricepsext', 'kickback', 'floorpress', 'souleve']) {
+      expect(getExercise(id).weights).toBe(true);
+    }
+    for (const id of ['pompes', 'squat', 'planche', 'dips', 'pont', 'curl-serviette', 'pompes-pike']) {
+      expect(getExercise(id).weights).toBe(false);
+    }
+  });
+
+  it('garde au moins deux exercices au poids du corps par muscle, dès le niveau débutant', () => {
+    for (const muscle of MUSCLES) {
+      const pool = EXERCISES.filter((e) => e.places.includes('maison') && !e.weights && e.minLevel === 0 && e.muscles[0] === muscle);
+      expect(pool.length).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('ne propose aucun exercice avec poids, quels que soient le niveau, la durée et les muscles', () => {
+    for (const level of levels) {
+      for (const durationMin of [20, 45, 90]) {
+        for (const muscles of [all, ['biceps'], ['epaules', 'triceps'], ['dos', 'biceps'], ['fessiers', 'jambes', 'abdos']] as Muscle[][]) {
+          const sessions = generateSessions({ muscles, level, ...home, durationMin, weekdays: days(0, 1, 2, 3, 4, 5, 6) }, 'p');
+          for (const exercise of sessions.flatMap((session) => session.exercises)) {
+            expect(getExercise(exercise.exerciseId).weights).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
+  it('travaille toujours chaque muscle choisi', () => {
+    for (const level of levels) {
+      const sessions = generateSessions({ muscles: all, level, ...home, durationMin: 45, weekdays: days(0, 2, 4) }, 'p');
+      const worked = new Set(sessions.flatMap((s) => s.exercises.map((e) => getExercise(e.exerciseId).muscles[0])));
+      for (const muscle of MUSCLES) expect(worked).toContain(muscle);
+    }
+  });
+
+  it('affiche exactement la durée choisie quand plusieurs groupes de muscles sont travaillés', () => {
+    for (const level of levels) {
+      for (const durationMin of [30, 45]) {
+        const sessions = generateSessions({ muscles: all, level, ...home, durationMin, weekdays: days(0, 2, 4) }, 'p');
+        expect(sessions.map((s) => s.durationMin)).toEqual([durationMin, durationMin, durationMin]);
+      }
+    }
+  });
+
+  it('garde les exercices avec haltères quand la personne en a', () => {
+    const sessions = generateSessions(
+      { muscles: ['dos', 'biceps'], level: 'inter', place: 'maison', durationMin: 45, weekdays: days(0) },
+      'p',
+    );
+    const ids = sessions[0].exercises.map((e) => e.exerciseId);
+    expect(ids).toContain('rowing');
+    expect(ids).toContain('curl');
+  });
+
+  it('ne change rien en salle, où il y a toujours des poids', () => {
+    const input = { muscles: all, level: 'inter' as const, place: 'salle' as const, durationMin: 45, weekdays: days(0, 2, 4) };
+    expect(generateSessions({ ...input, noWeights: true }, 'p')).toEqual(generateSessions(input, 'p'));
+    expect(createProgram({ ...input, noWeights: true }, 1, 'a').noWeights).toBe(false);
+  });
+
+  it('mémorise le choix dans le programme', () => {
+    const input = { muscles: all, level: 'inter' as const, durationMin: 45, weekdays: days(0) };
+    expect(createProgram({ ...input, ...home }, 1, 'a').noWeights).toBe(true);
+    expect(createProgram({ ...input, place: 'maison' }, 1, 'b').noWeights).toBe(false);
+  });
+
+  it('nomme le lieu', () => {
+    expect(placeLabel('maison')).toBe('Maison');
+    expect(placeLabel('maison', true)).toBe('Maison sans poids');
+    expect(placeLabel('salle', true)).toBe('Salle');
+  });
+
+  it('prévient quand la séance la plus courte est loin de la durée demandée', () => {
+    const base = { level: 'debutant' as const, ...home, durationMin: 45, weekdays: days(0) };
+    expect(previewSession({ ...base, muscles: all }).shortestMin).toBe(45);
+    const biceps = previewSession({ ...base, muscles: ['biceps'] });
+    expect(biceps.shortestMin).toBeLessThanOrEqual(25);
+    expect(biceps.shortestMin).toBeGreaterThan(0);
   });
 });

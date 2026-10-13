@@ -18,8 +18,12 @@ export function MiniPlayer({ onStart, style }: MiniPlayerProps) {
   const status = usePlayer((s) => s.status);
   const track = usePlayer(selectCurrentTrack);
   const external = usePlayer((s) => s.external);
+  const youtube = usePlayer((s) => s.youtube);
   const message = usePlayer((s) => s.message);
   const source = usePlayer((s) => s.source);
+
+  // la playlist YouTube a son propre lecteur, en bas de l'écran de séance
+  if (youtube) return null;
 
   // musique ouverte dans une autre application : on propose de la rouvrir
   if (external) {
