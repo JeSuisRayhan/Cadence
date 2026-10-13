@@ -17,7 +17,7 @@ export interface MusicSettings {
   genres: GenreId[];
   autoEngine: AutoEngine;
   externalApp: ExternalApp;
-  /** identifiant client Jamendo (gratuit), nécessaire à la composition dans l'application */
+  /** identifiant client Jamendo (gratuit), facultatif : il ajoute le catalogue Jamendo à celui d'Audius, qui n'a pas besoin de clé */
   jamendoClientId: string;
   files: LocalTrack[];
   /** lien d'une playlist YouTube */
@@ -46,11 +46,11 @@ export interface Track {
   /** adresse du fichier audio (distante ou locale) */
   uri: string;
   durationSec: number;
-  /** illustration (Jamendo) */
+  /** illustration (Jamendo, Audius) */
   artwork?: string;
   /** page du titre, pour les crédits */
   link?: string;
-  source: 'jamendo' | 'local';
+  source: 'jamendo' | 'audius' | 'local';
 }
 
 export interface ComposedPlaylist {

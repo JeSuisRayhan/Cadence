@@ -25,7 +25,7 @@ export const energyAt = (position: number): number => {
   return ENERGY_POINTS[ENERGY_POINTS.length - 1][1];
 };
 
-/** Vitesse Jamendo visée pour une énergie donnée : 0 = très lent … 4 = très rapide. */
+/** Vitesse visée pour une énergie donnée (échelle de Jamendo et d'Audius) : 0 = très lent … 4 = très rapide. */
 export const speedRankFor = (energy: number): number => Math.round(Math.min(1, Math.max(0, energy)) * 4);
 
 const SPEEDS = ['verylow', 'low', 'medium', 'high', 'veryhigh'] as const;

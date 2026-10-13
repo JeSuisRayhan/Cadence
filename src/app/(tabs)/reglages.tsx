@@ -60,15 +60,17 @@ export default function SettingsScreen() {
           <Text variant="caption" tone="subtle" style={styles.aboutLine}>
             Tes programmes et ton historique restent sur ce téléphone.
           </Text>
-          <Pressable accessibilityRole="link" onPress={() => void Linking.openURL('https://www.jamendo.com')} style={styles.aboutLink}>
-            <Text variant="caption" tone="subtle">
-              Les playlists automatiques utilisent le catalogue libre de{' '}
-              <Text variant="captionSemi" tone="muted">
-                Jamendo
-              </Text>
-              , pour un usage non commercial.
-            </Text>
-          </Pressable>
+          <Text variant="caption" tone="subtle" style={styles.aboutLink}>
+            Les playlists automatiques puisent dans{' '}
+            <Text variant="captionSemi" tone="muted" accessibilityRole="link" onPress={() => void Linking.openURL('https://audius.co')}>
+              Audius
+            </Text>{' '}
+            (artistes indépendants) et{' '}
+            <Text variant="captionSemi" tone="muted" accessibilityRole="link" onPress={() => void Linking.openURL('https://www.jamendo.com')}>
+              Jamendo
+            </Text>{' '}
+            (musique libre, usage non commercial).
+          </Text>
         </Card>
       </View>
     </Screen>

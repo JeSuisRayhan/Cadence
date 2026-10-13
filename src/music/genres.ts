@@ -9,15 +9,17 @@ export interface Genre {
   tags: readonly string[];
   /** mot utilisé pour chercher une playlist dans une application musicale */
   query: string;
+  /** Audius : un de ses styles, ou un mot-clé quand il n'a pas de style équivalent */
+  audius: { genre: string } | { query: string };
 }
 
 export const GENRES: readonly Genre[] = [
-  { id: 'hiphop', label: 'Hip-hop', cover: 'hiphop', tags: ['hiphop', 'rap'], query: 'hip hop' },
-  { id: 'electro', label: 'Électro', cover: 'electro', tags: ['electronic', 'house', 'techno'], query: 'electro' },
-  { id: 'rock', label: 'Rock', cover: 'rock', tags: ['rock', 'hardrock'], query: 'rock' },
-  { id: 'pop', label: 'Pop', cover: 'pop', tags: ['pop', 'dance'], query: 'pop' },
-  { id: 'afro', label: 'Afro', cover: 'afro', tags: ['afrobeat', 'afropop', 'african'], query: 'afrobeats' },
-  { id: 'lofi', label: 'Lo-fi', cover: 'lofi', tags: ['lofi', 'chillhop', 'chillout'], query: 'lofi' },
+  { id: 'hiphop', label: 'Hip-hop', cover: 'hiphop', tags: ['hiphop', 'rap'], query: 'hip hop', audius: { genre: 'Hip-Hop/Rap' } },
+  { id: 'electro', label: 'Électro', cover: 'electro', tags: ['electronic', 'house', 'techno'], query: 'electro', audius: { genre: 'Electronic' } },
+  { id: 'rock', label: 'Rock', cover: 'rock', tags: ['rock', 'hardrock'], query: 'rock', audius: { genre: 'Rock' } },
+  { id: 'pop', label: 'Pop', cover: 'pop', tags: ['pop', 'dance'], query: 'pop', audius: { genre: 'Pop' } },
+  { id: 'afro', label: 'Afro', cover: 'afro', tags: ['afrobeat', 'afropop', 'african'], query: 'afrobeats', audius: { query: 'afrobeats' } },
+  { id: 'lofi', label: 'Lo-fi', cover: 'lofi', tags: ['lofi', 'chillhop', 'chillout'], query: 'lofi', audius: { genre: 'Lo-Fi' } },
 ];
 
 export const genreById = (id: GenreId): Genre => GENRES.find((g) => g.id === id) ?? GENRES[0];

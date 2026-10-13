@@ -1,13 +1,15 @@
-import { composePlaylist, resolveClientId } from './jamendo';
+import { composePlaylist } from './compose';
+import { resolveClientId } from './jamendo';
 import type { ComposedPlaylist, GenreId, MusicSettings } from './types';
 
-/** Les titres Jamendo ne se gardent pas hors ligne : la playlist reste en mémoire, quelques heures au plus. */
+/** Les titres ne se gardent pas hors ligne : la playlist reste en mémoire, quelques heures au plus. */
 const TTL_MS = 3 * 60 * 60 * 1000;
 
 const cache = new Map<string, ComposedPlaylist>();
 
-export const playlistKey = (sessionId: string, genres: readonly GenreId[], durationMin: number): string =>
-  `${sessionId}|${[...genres].sort().join(',')}|${durationMin}`;
+/** Une clé Jamendo ajoutée ou changée donne un autre catalogue, donc une autre playlist. */
+export const playlistKey = (sessionId: string, genres: readonly GenreId[], durationMin: number, clientId = ''): string =>
+  `${sessionId}|${[...genres].sort().join(',')}|${durationMin}|${clientId}`;
 
 export const cachedPlaylist = (key: string, now: number = Date.now()): ComposedPlaylist | null => {
   const hit = cache.get(key);
@@ -38,18 +40,13 @@ export const loadPlaylist = async ({
   refresh = false,
   signal,
 }: PlaylistRequest): Promise<ComposedPlaylist> => {
-  const key = playlistKey(sessionId, music.genres, durationMin);
+  const clientId = resolveClientId(music.jamendoClientId);
+  const key = playlistKey(sessionId, music.genres, durationMin, clientId);
   if (!refresh) {
     const hit = cachedPlaylist(key);
     if (hit) return hit;
   }
-  const playlist = await composePlaylist({
-    sessionId,
-    clientId: resolveClientId(music.jamendoClientId),
-    genres: music.genres,
-    durationMin,
-    signal,
-  });
+  const playlist = await composePlaylist({ sessionId, clientId, genres: music.genres, durationMin, signal });
   cache.set(key, playlist);
   return playlist;
 };

@@ -1,4 +1,5 @@
 import { Linking } from 'react-native';
+import { audiusBody, audiusTrack, callsTo, fakeNetwork, jamendoBody, jamendoTrack, reply } from '../__fixtures__/network';
 import { clearPlaylists } from '../playlist';
 import { usePlayer, stopMusic } from '../player';
 import { musicSummary, startSessionMusic } from '../session';
@@ -29,26 +30,26 @@ const fake = (jest.requireMock('expo-audio') as { __fake: { replace: jest.Mock; 
 const target = { id: 'prog-1', durationMin: 45 };
 const settings = (patch: Partial<MusicSettings>): MusicSettings => ({ ...DEFAULT_MUSIC, ...patch });
 
-const catalogue = Array.from({ length: 30 }, (_, i) => ({
-  id: String(500 + i),
-  name: `Morceau ${i}`,
-  duration: 200,
-  artist_name: `Artiste ${i}`,
-  image: '',
-  audio: `https://audio.example/${500 + i}.mp3`,
-  shareurl: '',
-  musicinfo: { speed: ['verylow', 'low', 'medium', 'high', 'veryhigh'][i % 5] },
-}));
+const jamendoCatalogue = Array.from({ length: 30 }, (_, i) =>
+  jamendoTrack(500 + i, ['verylow', 'low', 'medium', 'high', 'veryhigh'][i % 5]),
+);
 
-const jamendo = () =>
-  jest.fn(() =>
-    Promise.resolve({ ok: true, status: 200, json: async () => ({ headers: { status: 'success' }, results: catalogue }) }),
-  );
+const audiusCatalogue = Array.from({ length: 30 }, (_, i) => audiusTrack(`s${i}`, { mood: null, bpm: [70, 95, 115, 135, 160][i % 5] }));
+
+/** Jamendo et Audius répondent, chacun avec son catalogue. */
+const services = () =>
+  fakeNetwork({
+    jamendo: () => reply(jamendoBody(jamendoCatalogue)),
+    audius: () => reply(audiusBody(audiusCatalogue)),
+  });
 
 const originalFetch = global.fetch;
 let open: jest.SpyInstance;
 
+const originalEnvKey = process.env.EXPO_PUBLIC_JAMENDO_CLIENT_ID;
+
 beforeEach(() => {
+  delete process.env.EXPO_PUBLIC_JAMENDO_CLIENT_ID;
   stopMusic();
   clearPlaylists();
   jest.clearAllMocks();
@@ -57,6 +58,8 @@ beforeEach(() => {
 
 afterEach(() => {
   global.fetch = originalFetch;
+  if (originalEnvKey === undefined) delete process.env.EXPO_PUBLIC_JAMENDO_CLIENT_ID;
+  else process.env.EXPO_PUBLIC_JAMENDO_CLIENT_ID = originalEnvKey;
 });
 
 describe('startSessionMusic', () => {
@@ -91,24 +94,31 @@ describe('startSessionMusic', () => {
     expect(usePlayer.getState().external).toMatchObject({ label: 'Deezer' });
   });
 
-  it('automatique dans l’application : compose puis joue la playlist', async () => {
-    const fetchMock = jamendo();
+  it('automatique dans l’application : compose avec Audius et Jamendo puis joue la playlist', async () => {
+    const fetchMock = services();
     global.fetch = fetchMock as unknown as typeof fetch;
     await startSessionMusic(target, settings({ jamendoClientId: 'cle', genres: ['hiphop', 'electro'] }));
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(callsTo(fetchMock, 'api.jamendo.com')).toHaveLength(2);
+    expect(callsTo(fetchMock, 'api.audius.co')).toHaveLength(2);
     const state = usePlayer.getState();
     expect(state.queue.length).toBeGreaterThan(5);
     expect(state.sessionId).toBe('prog-1');
     expect(fake.play).toHaveBeenCalledTimes(1);
   });
 
-  it('automatique dans l’application : demande la clé Jamendo quand elle manque', async () => {
-    const fetchMock = jamendo();
+  it('automatique dans l’application : sans clé Jamendo, joue les titres d’Audius', async () => {
+    const fetchMock = services();
     global.fetch = fetchMock as unknown as typeof fetch;
-    delete process.env.EXPO_PUBLIC_JAMENDO_CLIENT_ID;
-    await startSessionMusic(target, settings({ jamendoClientId: '' }));
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(usePlayer.getState().message).toMatch(/clé Jamendo/);
+    await startSessionMusic(target, settings({ jamendoClientId: '', genres: ['pop'] }));
+    expect(callsTo(fetchMock, 'api.jamendo.com')).toHaveLength(0);
+    expect(callsTo(fetchMock, 'api.audius.co')).toHaveLength(1);
+    const { queue, message } = usePlayer.getState();
+    expect(queue.length).toBeGreaterThan(5);
+    expect(queue.every((t) => t.source === 'audius')).toBe(true);
+    expect(queue[0].uri).toMatch(/^https:\/\/api\.audius\.co\/v1\/tracks\/.+\/stream\?app_name=Cadence$/);
+    expect(message).toBeNull();
+    expect(fake.replace).toHaveBeenCalledWith({ uri: queue[0].uri, name: queue[0].title });
+    expect(fake.play).toHaveBeenCalledTimes(1);
   });
 
   it('automatique dans l’application : explique l’échec réseau', async () => {
@@ -118,8 +128,16 @@ describe('startSessionMusic', () => {
     expect(usePlayer.getState().message).toMatch(/connexion/);
   });
 
+  it('automatique dans l’application : explique quand les deux sources ne répondent pas', async () => {
+    global.fetch = fakeNetwork({ jamendo: () => reply({}, 503), audius: () => reply({}, 500) }) as unknown as typeof fetch;
+    await startSessionMusic(target, settings({ jamendoClientId: 'cle' }));
+    expect(usePlayer.getState().status).toBe('idle');
+    expect(usePlayer.getState().message).toMatch(/ne répondent pas/);
+    expect(fake.play).not.toHaveBeenCalled();
+  });
+
   it('ne relance pas la musique déjà en cours pour la même séance', async () => {
-    const fetchMock = jamendo();
+    const fetchMock = services();
     global.fetch = fetchMock as unknown as typeof fetch;
     await startSessionMusic(target, settings({ jamendoClientId: 'cle', genres: ['pop'] }));
     const calls = fetchMock.mock.calls.length;
@@ -129,27 +147,35 @@ describe('startSessionMusic', () => {
   });
 
   it('réutilise la playlist composée quand on relance la même séance', async () => {
-    const fetchMock = jamendo();
+    const fetchMock = services();
     global.fetch = fetchMock as unknown as typeof fetch;
     await startSessionMusic(target, settings({ jamendoClientId: 'cle', genres: ['pop'] }));
     stopMusic();
     await startSessionMusic(target, settings({ jamendoClientId: 'cle', genres: ['pop'] }));
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(callsTo(fetchMock, 'api.audius.co')).toHaveLength(1);
+    expect(callsTo(fetchMock, 'api.jamendo.com')).toHaveLength(1);
     expect(fake.play).toHaveBeenCalledTimes(2);
   });
 
   it('abandonne la composition si la séance est quittée entre-temps', async () => {
-    let release: (value: unknown) => void = () => undefined;
+    const releases: ((value: unknown) => void)[] = [];
     global.fetch = jest.fn(
-      () =>
+      (url: string) =>
         new Promise((resolve) => {
-          release = resolve;
+          releases.push(() =>
+            resolve(
+              url.includes('audius')
+                ? { ok: true, status: 200, json: async () => audiusBody(audiusCatalogue) }
+                : { ok: true, status: 200, json: async () => jamendoBody(jamendoCatalogue) },
+            ),
+          );
         }),
     ) as unknown as typeof fetch;
     const pending = startSessionMusic(target, settings({ jamendoClientId: 'cle', genres: ['pop'] }));
     stopMusic();
-    release({ ok: true, status: 200, json: async () => ({ headers: { status: 'success' }, results: catalogue }) });
+    releases.forEach((release) => release(undefined));
     await pending;
+    expect(releases).toHaveLength(2);
     expect(fake.play).not.toHaveBeenCalled();
     expect(usePlayer.getState().queue).toEqual([]);
   });

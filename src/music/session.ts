@@ -1,6 +1,5 @@
 import { externalLabel, externalSearchUrl } from './external';
 import { genreLabels } from './genres';
-import { JamendoError, jamendoMessage, resolveClientId } from './jamendo';
 import { localToTrack } from './localTracks';
 import { loadPlaylist } from './playlist';
 import {
@@ -11,6 +10,7 @@ import {
   startQueue,
   usePlayer,
 } from './player';
+import { musicMessage } from './sources';
 import type { MusicSettings } from './types';
 import { parseYoutubeLink } from './youtube';
 
@@ -24,7 +24,7 @@ export const PLAYLIST_SOURCE = 'Playlist de la séance';
 /**
  * Lance la musique d'une séance selon les réglages :
  * - mode manuel : tes fichiers dans l'application, sinon ta playlist YouTube ouverte dans YouTube ;
- * - mode automatique : playlist composée dans l'application (Jamendo), ou recherche ouverte dans ton application musicale.
+ * - mode automatique : playlist composée dans l'application (Audius, plus Jamendo avec sa clé), ou recherche ouverte dans ton application musicale.
  */
 export const startSessionMusic = async (target: MusicTarget, music: MusicSettings): Promise<void> => {
   const current = usePlayer.getState();
@@ -54,16 +54,12 @@ export const startSessionMusic = async (target: MusicTarget, music: MusicSetting
   }
 
   const token = beginSessionMusic(target.id, PLAYLIST_SOURCE);
-  if (!resolveClientId(music.jamendoClientId)) {
-    setPlayerMessage(jamendoMessage(new JamendoError('no-key', '')));
-    return;
-  }
   try {
     const playlist = await loadPlaylist({ sessionId: target.id, durationMin: target.durationMin, music });
     if (!isCurrentStart(token)) return;
     await startQueue(playlist.tracks, PLAYLIST_SOURCE);
   } catch (error) {
-    if (isCurrentStart(token)) setPlayerMessage(jamendoMessage(error));
+    if (isCurrentStart(token)) setPlayerMessage(musicMessage(error));
   }
 };
 

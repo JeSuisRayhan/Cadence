@@ -12,17 +12,17 @@ export interface JamendoKeyCardProps {
   onCancel?: () => void;
 }
 
-/** Saisie de la clé gratuite Jamendo, nécessaire pour composer la playlist dans l'application. */
+/** Saisie de la clé gratuite Jamendo, facultative : elle ajoute le catalogue Jamendo à celui d'Audius. */
 export function JamendoKeyCard({ current = '', onSave, onCancel }: JamendoKeyCardProps) {
   const [value, setValue] = useState(current);
   const clean = value.trim();
 
   return (
     <Card radiusSize="panel" style={styles.card}>
-      <Text variant="rowTitle">Une clé gratuite pour composer ta playlist</Text>
+      <Text variant="rowTitle">Ajoute Jamendo pour plus de choix</Text>
       <Text variant="caption" tone="muted" style={styles.help}>
-        Cadence compose la playlist avec la musique libre de Jamendo. Crée un compte gratuit sur le portail développeurs de Jamendo,
-        copie ta clé (« client id ») et colle-la ici.
+        Ta playlist se compose déjà avec Audius, sans clé. Avec une clé gratuite, Cadence pioche aussi dans la musique libre de Jamendo :
+        crée un compte gratuit sur son portail développeurs, copie ta clé (« client id ») et colle-la ici.
       </Text>
       <TextInput
         value={value}

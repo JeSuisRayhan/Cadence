@@ -12,15 +12,16 @@ import { EnergyCurve } from './EnergyCurve';
 
 const VISIBLE = 4;
 
+const SOURCE_LABEL: Record<Track['source'], string> = { jamendo: 'Jamendo', audius: 'Audius', local: 'Mes fichiers' };
+
 export interface PlaylistCardProps {
   title: string;
-  state: Exclude<PreviewState, { status: 'off' } | { status: 'no-key' }>;
+  state: Exclude<PreviewState, { status: 'off' }>;
   onRefresh: () => void;
-  onEditKey: () => void;
 }
 
 /** La playlist composée pour la séance : sa courbe d'intensité et ses titres. */
-export function PlaylistCard({ title, state, onRefresh, onEditKey }: PlaylistCardProps) {
+export function PlaylistCard({ title, state, onRefresh }: PlaylistCardProps) {
   const [expanded, setExpanded] = useState(false);
 
   if (state.status === 'ready') {
@@ -90,7 +91,6 @@ export function PlaylistCard({ title, state, onRefresh, onEditKey }: PlaylistCar
       </Text>
       <View style={styles.actions}>
         <Button label="Réessayer" size="md" variant="outline" onPress={onRefresh} style={styles.grow} />
-        <Button label="Modifier ma clé" size="md" variant="quiet" onPress={onEditKey} />
       </View>
     </Card>
   );
@@ -129,7 +129,7 @@ function TrackRow({ track }: { track: Track }) {
           {track.title}
         </Text>
         <Text variant="caption" tone="subtle" numberOfLines={1}>
-          {track.artist}
+          {`${track.artist} · ${SOURCE_LABEL[track.source]}`}
         </Text>
       </View>
       <Text variant="caption" tone="subtle" style={styles.time}>

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { jamendoMessage, resolveClientId } from '../music/jamendo';
+import { resolveClientId } from '../music/jamendo';
 import { cachedPlaylist, loadPlaylist, playlistKey } from '../music/playlist';
+import { musicMessage } from '../music/sources';
 import type { ComposedPlaylist, GenreId, MusicSettings } from '../music/types';
 
 export type PreviewState =
   | { status: 'off' }
-  | { status: 'no-key' }
   | { status: 'loading' }
   | { status: 'ready'; playlist: ComposedPlaylist }
   | { status: 'error'; message: string };
@@ -32,8 +32,7 @@ export const usePlaylistPreview = (
   const clientId = resolveClientId(music.jamendoClientId);
   const genresKey = [...music.genres].sort().join(',');
   const genres = useMemo(() => genresKey.split(',').filter(Boolean) as GenreId[], [genresKey]);
-  const cacheKey = playlistKey(target.id, genres, target.durationMin);
-  const paramsKey = `${cacheKey}|${clientId}`;
+  const cacheKey = playlistKey(target.id, genres, target.durationMin, clientId);
 
   const [result, setResult] = useState<{ key: string; outcome: Outcome } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -52,25 +51,25 @@ export const usePlaylistPreview = (
         signal: controller.signal,
       })
         .then((playlist) => ({ status: 'ready', playlist }) as const)
-        .catch((error: unknown) => ({ status: 'error', message: jamendoMessage(error) }) as const)
+        .catch((error: unknown) => ({ status: 'error', message: musicMessage(error) }) as const)
         .then((outcome) => {
           if (controller.signal.aborted) return;
-          setResult({ key: paramsKey, outcome });
+          setResult({ key: cacheKey, outcome });
           setRefreshing(false);
         });
     },
-    [target.id, target.durationMin, genres, clientId, paramsKey],
+    [target.id, target.durationMin, genres, clientId, cacheKey],
   );
 
   // composition automatique quand les réglages changent et qu'aucune playlist n'est encore en mémoire
   useEffect(() => {
-    if (!enabled || !clientId || cachedPlaylist(cacheKey)) return;
+    if (!enabled || cachedPlaylist(cacheKey)) return;
     const timer = setTimeout(() => run(false), DEBOUNCE_MS);
     return () => {
       clearTimeout(timer);
       inFlight.current?.abort();
     };
-  }, [enabled, clientId, cacheKey, run]);
+  }, [enabled, cacheKey, run]);
 
   const refresh = useCallback(() => {
     setRefreshing(true);
@@ -79,9 +78,8 @@ export const usePlaylistPreview = (
 
   let state: PreviewState;
   if (!enabled) state = { status: 'off' };
-  else if (!clientId) state = { status: 'no-key' };
   else if (refreshing) state = { status: 'loading' };
-  else if (result?.key === paramsKey) state = result.outcome;
+  else if (result?.key === cacheKey) state = result.outcome;
   else {
     const hit = cachedPlaylist(cacheKey);
     state = hit ? { status: 'ready', playlist: hit } : { status: 'loading' };
