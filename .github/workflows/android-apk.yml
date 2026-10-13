@@ -1,0 +1,100 @@
+name: Compiler l'APK Android
+
+# Se lance à chaque envoi sur main, ou à la main : onglet Actions → « Compiler l'APK Android » → Run workflow.
+# Aucun compte ni secret n'est nécessaire. Le secret JAMENDO_CLIENT_ID est facultatif (voir README.md).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Un seul build à la fois par branche : un envoi plus récent annule le précédent.
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # nécessaire pour publier l'APK dans les Releases
+    permissions:
+      contents: write
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      # React Native 0.86 demande Java 17 pour compiler.
+      - name: Installer Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # npm ci installe exactement les versions de package-lock.json.
+      - name: Installer les dépendances
+        run: npm ci
+
+      # Si le code ne passe pas ces contrôles, on s'arrête ici : pas la peine de compiler 15 minutes.
+      - name: Vérifier le code (types, règles, tests)
+        run: |
+          npx tsc --noEmit
+          npx expo lint
+          npx jest --ci
+        env:
+          CI: "1"
+          EXPO_NO_TELEMETRY: "1"
+
+      # Android refuse d'installer une version identique à celle déjà présente : le numéro monte à chaque build.
+      - name: Numéroter la version
+        run: |
+          node -e "
+            const fs = require('fs');
+            const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+            app.expo.android = { ...app.expo.android, versionCode: Number(process.env.GITHUB_RUN_NUMBER) };
+            fs.writeFileSync('app.json', JSON.stringify(app, null, 2));
+          "
+
+      # Le dossier android/ n'est pas dans le dépôt : il est généré ici à partir de app.json.
+      - name: Générer le projet Android
+        run: npx expo prebuild --platform android --no-install
+        env:
+          CI: "1"
+          EXPO_NO_TELEMETRY: "1"
+
+      - name: Préparer Gradle (cache)
+        uses: gradle/actions/setup-gradle@v4
+
+      # Clé Jamendo facultative : si le secret existe, elle est intégrée à l'application.
+      # Sinon on la colle une fois dans l'application (Réglages → Musique de séance).
+      - name: Compiler l'APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g" -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+        env:
+          EXPO_PUBLIC_JAMENDO_CLIENT_ID: ${{ secrets.JAMENDO_CLIENT_ID }}
+          CI: "1"
+
+      - name: Renommer l'APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk Cadence.apk
+
+      # Téléchargement direct de l'APK depuis la page « Releases » du dépôt (pratique sur tablette).
+      - name: Publier dans les Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Cadence · build ${{ github.run_number }}
+          body: APK Android de Cadence, compilé automatiquement. Télécharge Cadence.apk puis ouvre-le pour l'installer.
+          files: Cadence.apk
+
+      # Même fichier, en archive zip, au cas où.
+      - name: Garder une copie dans les artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cadence-apk
+          path: Cadence.apk
+          retention-days: 30
